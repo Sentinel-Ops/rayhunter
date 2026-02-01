@@ -4,8 +4,9 @@ use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 
 use crate::gsmtap::{GsmtapHeader, GsmtapMessage, GsmtapType};
+use crate::shannon::DmMessagesContainer;
 use crate::util::RuntimeMetadata;
-use crate::{diag::MessagesContainer, gsmtap_parser};
+use crate::{diag::MessagesContainer, gsmtap_parser, shannon_gsmtap_parser};
 
 use super::{
     connection_redirect_downgrade::ConnectionRedirect2GDowngradeAnalyzer,
@@ -417,6 +418,49 @@ impl Harness {
             };
 
             let Some((timestamp, gsmtap_msg)) = gsmtap_message else {
+                continue;
+            };
+            row.packet_timestamp = Some(timestamp.to_datetime());
+
+            let element = match InformationElement::try_from(&gsmtap_msg) {
+                Ok(element) => element,
+                Err(err) => {
+                    row.skipped_message_reason = Some(format!("{err:?}"));
+                    continue;
+                }
+            };
+
+            row.events = self.analyze_information_element(&element);
+        }
+        rows
+    }
+
+    /// Analyze Samsung Shannon DM messages
+    ///
+    /// This is the equivalent of `analyze_qmdl_messages` for Samsung Shannon modems
+    /// found in Google Pixel 6+ devices.
+    pub fn analyze_shannon_messages(&mut self, container: DmMessagesContainer) -> Vec<AnalysisRow> {
+        let mut rows = Vec::new();
+        for dm_message in container.messages {
+            self.packet_num += 1;
+
+            rows.push(AnalysisRow {
+                packet_timestamp: None,
+                skipped_message_reason: None,
+                events: Vec::new(),
+            });
+            // unwrap is safe here since we just pushed a value
+            let row = rows.last_mut().unwrap();
+
+            let gsmtap_result = match shannon_gsmtap_parser::parse(&dm_message) {
+                Ok(msg) => msg,
+                Err(err) => {
+                    row.skipped_message_reason = Some(format!("{err:?}"));
+                    continue;
+                }
+            };
+
+            let Some((timestamp, gsmtap_msg)) = gsmtap_result else {
                 continue;
             };
             row.packet_timestamp = Some(timestamp.to_datetime());

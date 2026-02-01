@@ -13,6 +13,7 @@ pub mod util;
 
 // Samsung Shannon modem support (Google Pixel 6+)
 pub mod shannon;
+pub mod shannon_gsmtap_parser;
 
 // bin/check.rs may target windows and does not use this mod
 #[cfg(target_family = "unix")]
