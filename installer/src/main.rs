@@ -2,6 +2,7 @@ use anyhow::{Context, Error, bail};
 use clap::{Parser, Subcommand};
 use env_logger::Env;
 
+mod android;
 mod orbic;
 mod orbic_auth;
 mod orbic_network;
@@ -42,6 +43,10 @@ enum Command {
     Tplink(InstallTpLink),
     /// Install rayhunter on the Wingtech CT2MHS01.
     Wingtech(WingtechArgs),
+    /// Install rayhunter on a Google Pixel 6/7/8/9 (Samsung Shannon modem).
+    ///
+    /// Requires a rooted device with ADB access. Supports GrapheneOS and other custom ROMs.
+    Pixel9(InstallPixel9),
     /// Developer utilities.
     Util(Util),
 }
@@ -89,6 +94,13 @@ struct OrbicNetworkArgs {
 
 #[derive(Parser, Debug)]
 struct InstallPinephone {}
+
+#[derive(Parser, Debug)]
+struct InstallPixel9 {
+    /// Uninstall rayhunter instead of installing.
+    #[arg(long)]
+    uninstall: bool,
+}
 
 #[derive(Parser, Debug)]
 struct Util {
@@ -210,6 +222,13 @@ async fn run() -> Result<(), Error> {
         Command::Orbic(_) => orbic::install().await.context("\nFailed to install rayhunter on the Orbic RC400L")?,
         Command::OrbicNetwork(args) => orbic_network::install(args.admin_ip, args.admin_username, args.admin_password).await.context("\nFailed to install rayhunter on the Orbic RC400L via network exploit")?,
         Command::Wingtech(args) => wingtech::install(args).await.context("\nFailed to install rayhunter on the Wingtech CT2MHS01")?,
+        Command::Pixel9(args) => {
+            if args.uninstall {
+                android::uninstall().await.context("\nFailed to uninstall rayhunter from Pixel")?
+            } else {
+                android::install(android::AndroidArgs::default()).await.context("\nFailed to install rayhunter on Pixel 6+. Make sure your device is rooted and ADB is enabled.")?
+            }
+        }
         Command::Util(subcommand) => match subcommand.command {
             UtilSubCommand::Serial(serial_cmd) => {
                 if serial_cmd.root {
