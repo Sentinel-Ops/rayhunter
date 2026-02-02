@@ -12,6 +12,7 @@ pub mod smdl;
 pub mod util;
 
 // Samsung Shannon modem support (Google Pixel 6+)
+pub mod sdm_parser;
 pub mod shannon;
 pub mod shannon_gsmtap_parser;
 
